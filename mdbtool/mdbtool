@@ -1,0 +1,79 @@
+#!/usr/bin/python3
+
+import argparse
+import importlib
+import logging
+
+PLUGIN_PKG = 'plugins'
+
+ENTRY_MAP = {
+    'backup'  : 'Backup',
+    'restore' : 'Restore'
+}
+
+class Main:
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.initParser()
+
+    def backup(self):
+        if (self.args.list):
+            print('list')
+            return
+        plugin = self.args.plugin
+        if not (plugin):
+            print('plugin is required')
+            exit(1)
+        print('processing %s' % plugin)
+        module = self.loadPlugin(plugin=plugin, entry='backup')
+        module.main(self.args.args)
+
+    def restore(self):
+        pass
+
+    def loadPlugin(self, plugin=None, entry=None):
+        module = None
+        package = '.'.join([PLUGIN_PKG, plugin, ENTRY_MAP[entry] ])
+        try:
+            module = importlib.import_module(package)
+            getattr(module, 'main')
+        except ImportError :
+            print('Enable to find %s' % '/'.join([PLUGIN_PKG, plugin, ENTRY_MAP[entry] + '.py' ]))
+            exit(1)
+        except AttributeError :
+            print('%s should have method "main"' % package)
+            exit(1)
+        return module
+
+    def initParser(self):
+        self.parser = argparse.ArgumentParser(description='Tool for backing up mariaDB')
+        subparsers = self.parser.add_subparsers(
+            title='commands',
+            dest='command'
+        )
+
+        parser_backup = subparsers.add_parser('backup', help='backup database')
+        parser_backup.add_argument('--list', help='list available plugins', action='store_true')
+        parser_backup.add_argument('plugin', help='backup plugin', nargs='?')
+        parser_backup.add_argument('args', nargs=argparse.REMAINDER)
+
+        parser_restore = subparsers.add_parser('restore', help='restore database')
+        parser_restore.add_argument('plugin', help='restore plugin')
+        parser_restore.add_argument('args', nargs=argparse.REMAINDER)
+
+    def exec(self):
+        self.args = self.parser.parse_args()
+        print(self.args)
+        command = self.args.command
+        if (command == 'backup'):
+            self.backup()
+        elif (command == 'restore'):
+            self.restore()
+        else :
+            self.parser.print_help()
+            exit(1)
+
+main = Main()
+main.exec()
+
