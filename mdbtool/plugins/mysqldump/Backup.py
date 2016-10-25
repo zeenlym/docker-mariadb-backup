@@ -3,67 +3,94 @@ import os, sys, subprocess
 import argparse
 import logging
 from datetime import datetime
+from . import printHeader, checkAndGetEnv, checkBin, DEST_DIR
 
 BIN = 'mysqldump'
-DEST_DIR = '/backup'
-OUTFILE_FORMAT = 'mysqldump_{}_{:%F-%T}.sql'
+OUTFILE_FORMAT = 'mysqldump_{}_{:%F-%H-%M-%S}.sql'
+COMPRESS_METHODS = ['zip', 'tar', 'tarball', 'bzip2']
 
-def checkBin():
-#     subprocess.Popen
-    try:
-        subprocess.run(['which',BIN], check=True)
-    except subprocess.CalledProcessError:
-        print('%s binary is required, please install it and run again' % BIN)
-        exit(1)
+DESCRIPTION = 'Backup mariaDB with mysqldump'
 
-def checkAndGetEnv(name):
-    val = os.environ(name)
-    if not (val):
-        print('Env Var {} is not set, please set and retry'.format(name))
-        exit(1)
-    return val
+logger = logging.getLogger(__name__)
 
-def main(args):
-    logger = logging.getLogger(__name__)
-    parser = argparse.ArgumentParser(
-        prog='%s %s %s' % (sys.argv[0], sys.argv[1], 'mysqldump'),
-        description='Backup mariaDB with mysqldump'
-    )
-    parser.add_argument('--skip-mysql-env', help='Ignore all MYSQL env', action='store_true')
-    parser.add_argument('--compress-with', help='Compress dump with binary', choices=['zip', 'tar', 'tarball', 'bzip2'])
-    parser.add_argument('+', help='Put this to ensure following args passed to mysqldump', nargs='?')
-    parser.add_argument('args', help='Arguments to pass to mysqldump', nargs=argparse.REMAINDER)
-    args = parser.parse_args(args)
-    logger.debug('Parsed args :' + str(args))
-    
-    checkBin()
-    
+def backup(args):
+    printHeader('BackUp')
+    print('Backing up data')
     cmd = [BIN]
     if not (args.skip_mysql_env):
         # Host
-        cmd.extend(['-h', checkAndGetEnv('MYSQL_HOST')])
+        cmd.append('-h{}'.format(checkAndGetEnv('MYSQL_HOST')))
         
         # User 
-        cmd.extend(['-u', checkAndGetEnv('MYSQL_USER')])
+        cmd.append('-u{}'.format(checkAndGetEnv('MYSQL_USER')))
         
         # Password
-        if ( os.environ['MYSQL_PASS'] ) :
-            cmd.extend(['-p', os.environ['MYSQL_PASS']])
+        if ( os.environ['MYSQL_PASSWORD'] ) :
+            cmd.append('-p{}'.format(os.environ['MYSQL_PASSWORD']))
     
     cmd.extend(args.args)
+    
+    cmd.append('--result-file {}'.format(os.path.join(DEST_DIR, args.outfile)))
+    cmd.append(args.database)
+    
+    final_cmd = ' '.join(cmd)
+    logger.debug('Running command : {}'.format(final_cmd))
+    subprocess.check_call(final_cmd, shell=True)
+    print('Backing successfull')
+    return
+
+def generateMd5(file):
+    if not ( file ):
+        raise ValueError('unable to generate md5, file required')
+    printHeader('md5')
+    print('generating md5 files')
+    outfile = file + '.md5'
+    command = ' '.join(['md5sum -b', file, " > ",outfile])
+    subprocess.check_call(command, shell=True, cwd=DEST_DIR)
+    return
+
+def compress(file=None):
+    if not ( file ):
+        raise ValueError('unable to compress, file required')
+    printHeader('Compression')
+    outfile = file + '.7z'
+    cmd = ['7zr', 'a', outfile]
+    cmd.append(file)
+    try:
+        command = ' '.join(cmd)
+        logger.debug('Running command : {}'.format(command))
+        subprocess.check_call(command, shell=True, cwd=DEST_DIR)
+        os.remove(os.path.join(DEST_DIR,file))
+        generateMd5(outfile)
+    except subprocess.CalledProcessError:
+        print('Error while compressing')
+        exit()
+    return
+
+def main(args):
+    parser = argparse.ArgumentParser(
+        prog='%s %s %s' % (sys.argv[0], sys.argv[1], 'mysqldump'),
+        description=DESCRIPTION
+    )
+    parser.add_argument('--skip-mysql-env', help='Ignore all MYSQL env', action='store_true')
+    parser.add_argument('--no-compress', help='Do not compress', dest='compress', action='store_false')
+    parser.add_argument('+', help='Put this to ensure following args passed to mysqldump', nargs='?')
+    parser.add_argument('args', help='Arguments to pass to mysqldump', nargs=argparse.REMAINDER)
+    args = parser.parse_args(args)
+    logger.debug('Parsed args : {}'.format(args))
     
     database=''
     if not (args.skip_mysql_env):
         # Database
         database = os.environ['MYSQL_DATABASE']
-        cmd.extend(database)
     
-    cmd.append('>')
+    args.database = database
+    args.outfile = OUTFILE_FORMAT.format(database, datetime.now())
     
-    cmd.append(os.path.join(DEST_DIR, OUTFILE_FORMAT.format(database, datetime.now())))
+    checkBin(BIN)
+    backup(args)
+    if (args.compress):
+        compress(file=args.outfile)
+    else:
+        generateMd5(args.outfile)
     
-    try:
-        subprocess.run(cmd,check=True)
-    except subprocess.CalledProcessError:
-        print('Error while backing up')
-        exit(1)
