@@ -1,0 +1,18 @@
+#!/bin/bash
+
+PIDFILE=/var/run/backup.pid
+
+if [ -f $PIDFILE ]; then
+    echo $0 is already running with pid $(cat $PIDFILE), aborting!
+    exit 1
+fi
+
+echo $$ >$PIDFILE
+
+mdbtool backup ${BACKUP_METHOD} ${BACKUP_OPTS}
+
+retval=$?
+
+rm $PIDFILE
+
+exit $retval
