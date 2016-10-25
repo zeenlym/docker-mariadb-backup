@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import argparse
+import argparse, os
 import importlib
 import logging
 
@@ -19,18 +19,36 @@ class Main:
 
     def backup(self):
         if (self.args.list):
-            print('list')
+            self.listPlugins('backup')
             return
         plugin = self.args.plugin
         if not (plugin):
             print('plugin is required')
             exit(1)
-        print('processing %s' % plugin)
         module = self.loadPlugin(plugin=plugin, entry='backup')
         module.main(self.args.args)
 
     def restore(self):
-        pass
+        plugin = self.args.plugin
+        if not (plugin):
+            print('plugin is required')
+            exit(1)
+        module = self.loadPlugin(plugin=plugin, entry='restore')
+        module.main(self.args.args)
+
+    def listPlugins(self, entry=None):
+        for plugin in os.listdir(os.path.join(os.path.dirname(os.path.realpath(__file__)),PLUGIN_PKG)):
+            module = None
+            package = '.'.join([PLUGIN_PKG, plugin, ENTRY_MAP[entry] ])
+            try:
+                module = importlib.import_module(package)
+                getattr(module, 'main')
+                desc = ''
+                if ( hasattr(module, 'DESCRIPTION') ):
+                    desc = getattr(module, 'DESCRIPTION')
+                print('{} - {}'.format(plugin,desc))
+            except (ImportError, AttributeError):
+                pass
 
     def loadPlugin(self, plugin=None, entry=None):
         module = None
@@ -48,6 +66,7 @@ class Main:
 
     def initParser(self):
         self.parser = argparse.ArgumentParser(description='Tool for backing up mariaDB')
+        self.parser.add_argument('--log-level', help='log level', choices=list(range(5)))
         subparsers = self.parser.add_subparsers(
             title='commands',
             dest='command'
@@ -64,7 +83,7 @@ class Main:
 
     def exec(self):
         self.args = self.parser.parse_args()
-        print(self.args)
+        self.logger.debug('Parsed args : {}'.format(self.args))
         command = self.args.command
         if (command == 'backup'):
             self.backup()
@@ -74,6 +93,11 @@ class Main:
             self.parser.print_help()
             exit(1)
 
-main = Main()
-main.exec()
+if __name__ == '__main__':
+    logging.basicConfig(
+#         level=logging.DEBUG,
+#          format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    main = Main()
+    main.exec()
 
