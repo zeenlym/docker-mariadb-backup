@@ -28,7 +28,7 @@ Docker Compose
         image: zeenlym/mariadb-backup
         environment:
             - TIMEZONE=Europe/Berlin
-            - SCHEDULE="0 0 3 * *"
+            - SCHEDULE=0 0 3 * *
             - BACKUP_METHOD=mysqldump
             - MYSQL_HOST=mysql
             - MYSQL_DATABASE=database
