@@ -83,9 +83,10 @@ class Main:
 
     def exec(self):
         self.args = self.parser.parse_args()
-        logging.basicConfig(
-            level=getattr(logging, self.args.log.upper(),None)
-        )
+        if self.args.log:
+            logging.basicConfig(
+                level=getattr(logging, self.args.log.upper(),None)
+            )
         self.logger.debug('Parsed args : {}'.format(self.args))
         command = self.args.command
         if (command == 'backup'):
