@@ -10,6 +10,20 @@ OUTFILE_FORMAT = 'mysqldump_{}_{:%F-%H-%M-%S}.sql'
 COMPRESS_METHODS = ['zip', 'tar', 'tarball', 'bzip2']
 
 DESCRIPTION = 'Backup mariaDB with mysqldump'
+EPILOG = '''
+Environment:
+    mysqldump method use these environment variable for default command line argument.
+    You can skip this comportement with swith --skip-mysql-env
+
+    MYSQL_HOST        [required] mysql database host
+    MYSQL_USER        [required] mysql database user
+    MYSQL_PASSWORD    [optional] user password
+    MYSQL_DATABASE    [optional] database to backup
+
+Example
+    Backup in single transaction
+    mdbtool backup mysqldump + --single-transaction
+'''
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +84,9 @@ def compress(file=None):
 def main(args):
     parser = argparse.ArgumentParser(
         prog='%s %s %s' % (sys.argv[0], sys.argv[1], 'mysqldump'),
-        description=DESCRIPTION
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=DESCRIPTION,
+        epilog=EPILOG
     )
     parser.add_argument('--skip-mysql-env', help='Ignore all MYSQL env', action='store_true')
     parser.add_argument('--no-compress', help='Do not compress', dest='compress', action='store_false')
