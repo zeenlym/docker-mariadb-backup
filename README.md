@@ -23,7 +23,7 @@ docker run \
 ```
 
 Docker Compose
-```
+```yaml
     test-backup:
         image: zeenlym/mariadb-backup
         environment:
