@@ -138,7 +138,7 @@ class Restorer:
             begining.extend([
                 '7zr e -so',
                 fullpath,
-                '2 > /dev/null'
+                '2>/dev/null'
                 '|'
             ])
         else:
